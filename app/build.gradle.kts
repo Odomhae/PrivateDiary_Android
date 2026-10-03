@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.whisper.android)
     implementation(libs.litertlm.android)
+    implementation(libs.android.vad.silero)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
