@@ -12,6 +12,7 @@ import java.io.File
 
 class DiaryPipelineTest {
     private val passVad = object : VoiceActivityDetector {
+        override val frameBytes = 4
         override fun isSpeech(frame: ByteArray) = true
         override fun release() {}
     }
@@ -38,7 +39,7 @@ class DiaryPipelineTest {
         val stages = mutableListOf<PipelineStage>()
         val calls = mutableListOf<String>()
         val wav = File.createTempFile("pipe", ".wav")
-        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(4), fakeTranscriber("안녕", calls), fakeAnalyzer(calls)) { stages += it }
+        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("안녕", calls), fakeAnalyzer(calls), onStage = { stages += it })
         val result = pipeline.run(ByteArray(8) { 1 }, wav)
         assertEquals("평온", result.emotion)
         assertEquals(
@@ -54,7 +55,7 @@ class DiaryPipelineTest {
     @Test fun transcript_is_passed_to_analyzer() = runTest {
         val calls = mutableListOf<String>()
         val wav = File.createTempFile("pipe", ".wav")
-        DiaryPipeline(passVad, SilenceTrimmer(4), fakeTranscriber("오늘 피곤", calls), fakeAnalyzer(calls)) {}
+        DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("오늘 피곤", calls), fakeAnalyzer(calls)) {}
             .run(ByteArray(4) { 1 }, wav)
         assertTrue(calls.contains("a.analyze:오늘 피곤"))
     }
@@ -63,10 +64,13 @@ class DiaryPipelineTest {
         val stages = mutableListOf<PipelineStage>()
         val calls = mutableListOf<String>()
         val wav = File.createTempFile("pipe", ".wav")
-        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(4), fakeTranscriber("x", calls), fakeAnalyzer(calls, throwIt = true)) { stages += it }
+        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("x", calls), fakeAnalyzer(calls, throwIt = true), onStage = { stages += it })
         var threw = false
         try { pipeline.run(ByteArray(4) { 1 }, wav) } catch (e: Exception) { threw = true }
         assertTrue(threw)
         assertTrue(!stages.contains(PipelineStage.Done))
+        // 실패해도 각 모델은 해제되어야 한다(누수 방지, I1)
+        assertTrue(calls.contains("t.release"))
+        assertTrue(calls.contains("a.release"))
     }
 }

@@ -42,16 +42,15 @@ class PipelineViewModel(app: Application) : AndroidViewModel(app) {
                 val app = getApplication<Application>()
                 val pipeline = DiaryPipeline(
                     vad = SileroVad(app),
-                    trimmer = SilenceTrimmer(frameBytes = 1024),
+                    trimmer = SilenceTrimmer(),
                     transcriber = WhisperTranscriber(app, paths.whisperModel.absolutePath),
                     analyzer = LiteRtDiaryAnalyzer(paths.gemmaModel.absolutePath, app.cacheDir.absolutePath),
                     onStage = { s -> _state.value = _state.value.copy(stage = s) },
+                    onTranscript = { text -> _state.value = _state.value.copy(transcript = text) },
                 )
                 val workWav = File(File(app.filesDir, "recordings"), "last.wav")
                 val result = withContext(dispatcher) { pipeline.run(pcm, workWav) }
-                _state.value = _state.value.copy(
-                    stage = PipelineStage.Done, analysis = result, transcript = result.raw,
-                )
+                _state.value = _state.value.copy(stage = PipelineStage.Done, analysis = result)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(stage = PipelineStage.Failed, error = e.message)
             }

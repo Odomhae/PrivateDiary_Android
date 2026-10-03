@@ -17,6 +17,9 @@ class SileroVad(context: Context) : VoiceActivityDetector {
         speechDurationMs = 50,
     )
 
+    /** FRAME_SIZE_512 sample × 16-bit = 1024 byte. isSpeech는 정확히 이 크기를 요구한다. */
+    override val frameBytes: Int = 512 * 2
+
     override fun isSpeech(frame: ByteArray): Boolean = vad.isSpeech(frame)
 
     override fun release() = vad.close()
