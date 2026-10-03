@@ -7,9 +7,7 @@ plugins {
 android {
     namespace = "com.odom.privatediary"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
