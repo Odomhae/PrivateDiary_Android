@@ -24,7 +24,7 @@ class WhisperTranscriber(
         return TranscriptResult(
             text = result.text,
             latencyMs = latencyMs,
-            peakRssKb = Benchmark.currentPssKb(),
+            pssKb = Benchmark.currentPssKb(),
         )
     }
 

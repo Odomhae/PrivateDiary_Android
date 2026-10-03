@@ -34,7 +34,7 @@ class LiteRtDiaryAnalyzer(
             ).use { conversation -> conversation.sendMessage(prompt).toString() }
         }
         val latencyMs = (System.nanoTime() - start) / 1_000_000
-        return result.copy(latencyMs = latencyMs, peakRssKb = Benchmark.currentPssKb())
+        return result.copy(latencyMs = latencyMs, pssKb = Benchmark.currentPssKb())
     }
 
     override fun release() {

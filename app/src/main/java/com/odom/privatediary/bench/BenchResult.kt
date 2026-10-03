@@ -6,17 +6,17 @@ data class BenchRecord(
     val model: String,
     val inputId: String,
     val latencyMs: Long,
-    val peakRssKb: Long,
+    val pssKb: Long,
     val ok: Boolean,
     val note: String = "",
 ) {
     fun toCsvRow(): String = listOf(
-        model, inputId, latencyMs.toString(), peakRssKb.toString(), ok.toString(),
+        model, inputId, latencyMs.toString(), pssKb.toString(), ok.toString(),
         note.replace(",", ";"),
     ).joinToString(",")
 
     companion object {
-        const val CSV_HEADER = "model,inputId,latencyMs,peakRssKb,ok,note"
+        const val CSV_HEADER = "model,inputId,latencyMs,pssKb,ok,note"
     }
 }
 

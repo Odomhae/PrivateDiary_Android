@@ -34,8 +34,12 @@ adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/sa
    ```
    화면 하단 로그에도 모델별 지연시간·PSS가 표시된다.
 
+> **측정값 해석 주의**
+> - `pssKb`는 **추론 직후 1회 측정한 PSS(KB)** 로, 진짜 피크가 아니라 말단 샘플이다 — 실제 피크보다 **낮게** 나올 수 있다. Gemma 3n E2B가 기기 RAM(~8GB)에 맞는지 판단할 때는 이 값을 **하한**으로 보고 여유를 둬야 한다.
+> - 화면에 `whisper ERROR ...` / `gemma ERROR ...` 로그가 뜨면 그 샘플은 **CSV에 행이 기록되지 않는다**(생성/엔진 예외는 재시도하지 않음). ERROR가 보이면 해당 녹음은 실패로 간주하고 원인을 따로 적는다.
+
 ## 4. 측정 기록 (녹음 10개)
-| rec | whisper ms | whisper PSS KB | 전사 품질(1~5) | gemma ms | gemma PSS KB | JSON ok | 감정 적절(1~5) |
+| rec | whisper ms | whisper pssKb | 전사 품질(1~5) | gemma ms | gemma pssKb | JSON ok | 감정 적절(1~5) |
 |-----|-----------|----------------|----------------|----------|--------------|---------|----------------|
 | 01  |           |                |                |          |              |         |                |
 | 02  |           |                |                |          |              |         |                |

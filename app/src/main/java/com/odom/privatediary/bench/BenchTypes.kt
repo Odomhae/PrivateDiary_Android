@@ -3,7 +3,7 @@ package com.odom.privatediary.bench
 data class TranscriptResult(
     val text: String,
     val latencyMs: Long,
-    val peakRssKb: Long,
+    val pssKb: Long,
 )
 
 data class AnalysisResult(
@@ -17,5 +17,5 @@ data class AnalysisResult(
     val raw: String,
     val parseOk: Boolean,
     val latencyMs: Long = 0,
-    val peakRssKb: Long = 0,
+    val pssKb: Long = 0,
 )

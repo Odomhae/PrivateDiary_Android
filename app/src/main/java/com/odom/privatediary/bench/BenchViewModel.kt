@@ -24,6 +24,7 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
     private val paths = ModelPaths.from(app)
     private val csv = File(app.filesDir, "bench_results.csv")
     private val dispatcher = Dispatchers.Default
+    private var lastWavName = "?"
 
     private val _state = MutableStateFlow(
         BenchUiState(whisperReady = paths.whisperReady(), gemmaReady = paths.gemmaReady())
@@ -32,16 +33,17 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
 
     fun runWhisper(wav: File) {
         if (_state.value.running != null) return
+        lastWavName = wav.name
         _state.value = _state.value.copy(running = "whisper")
         viewModelScope.launch {
             val t = WhisperTranscriber(getApplication(), paths.whisperModel.absolutePath)
             try {
                 val result = withContext(dispatcher) { t.load(); t.transcribe(wav) }
-                BenchRecord("whisper", wav.name, result.latencyMs, result.peakRssKb, true).appendTo(csv)
+                BenchRecord("whisper", wav.name, result.latencyMs, result.pssKb, true).appendTo(csv)
                 _state.value = _state.value.copy(
                     transcript = result.text,
                     running = null,
-                    log = _state.value.log + "whisper ${result.latencyMs}ms pss=${result.peakRssKb}KB",
+                    log = _state.value.log + "whisper ${result.latencyMs}ms pss=${result.pssKb}KB",
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(running = null, log = _state.value.log + "whisper ERROR ${e.message}")
@@ -62,11 +64,11 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
             )
             try {
                 val result = withContext(dispatcher) { a.load(); a.analyze(transcript) }
-                BenchRecord("gemma", "transcript", result.latencyMs, result.peakRssKb, result.parseOk).appendTo(csv)
+                BenchRecord("gemma", lastWavName, result.latencyMs, result.pssKb, result.parseOk).appendTo(csv)
                 _state.value = _state.value.copy(
                     analysis = result,
                     running = null,
-                    log = _state.value.log + "gemma ${result.latencyMs}ms pss=${result.peakRssKb}KB ok=${result.parseOk}",
+                    log = _state.value.log + "gemma ${result.latencyMs}ms pss=${result.pssKb}KB ok=${result.parseOk}",
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(running = null, log = _state.value.log + "gemma ERROR ${e.message}")
