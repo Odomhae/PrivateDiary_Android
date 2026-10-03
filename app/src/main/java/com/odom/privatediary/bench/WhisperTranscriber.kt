@@ -12,7 +12,7 @@ class WhisperTranscriber(
 ) : Transcriber {
     private var model: WhisperModel? = null
 
-    suspend fun load() {
+    override suspend fun load() {
         model = Whisper.loadModel(context, modelPath)
     }
 

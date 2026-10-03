@@ -14,7 +14,7 @@ class LiteRtDiaryAnalyzer(
     private var engine: Engine? = null
 
     /** 초기화는 최대 10초가 걸릴 수 있으므로 백그라운드 디스패처에서 호출한다. */
-    suspend fun load() {
+    override suspend fun load() {
         val e = Engine(
             EngineConfig(modelPath = modelPath, backend = Backend.CPU(), cacheDir = cacheDir)
         )
