@@ -7,6 +7,8 @@ import com.odom.privatediary.bench.AnalysisResult
 import com.odom.privatediary.bench.LiteRtDiaryAnalyzer
 import com.odom.privatediary.bench.ModelPaths
 import com.odom.privatediary.bench.WhisperTranscriber
+import com.odom.privatediary.data.DiaryDatabase
+import com.odom.privatediary.data.DiaryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,7 @@ data class PipelineUiState(
 class PipelineViewModel(app: Application) : AndroidViewModel(app) {
     private val paths = ModelPaths.from(app)
     private val recorder = AudioRecorder()
+    private val repo = DiaryRepository(DiaryDatabase.get(app).entryDao())
     private val dispatcher = Dispatchers.Default
 
     private val _state = MutableStateFlow(PipelineUiState())
@@ -50,6 +53,10 @@ class PipelineViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 val workWav = File(File(app.filesDir, "recordings"), "last.wav")
                 val result = withContext(dispatcher) { pipeline.run(pcm, workWav) }
+                val durationSec = pcm.size / (16000 * 2)
+                withContext(dispatcher) {
+                    runCatching { repo.saveEntry(_state.value.transcript, result, durationSec) }
+                }
                 _state.value = _state.value.copy(stage = PipelineStage.Done, analysis = result)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(stage = PipelineStage.Failed, error = e.message)
