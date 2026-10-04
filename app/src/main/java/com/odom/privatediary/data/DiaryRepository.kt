@@ -33,5 +33,6 @@ class DiaryRepository(
     fun observeEntries(): Flow<List<EntryEntity>> = entryDao.observeAll()
     suspend fun entriesOn(date: String): List<EntryEntity> = entryDao.byDate(date)
     suspend fun entry(id: String): EntryEntity? = entryDao.byId(id)
+    suspend fun updateTranscript(id: String, transcript: String) = entryDao.updateTranscript(id, transcript)
     suspend fun deleteEntry(id: String) = entryDao.delete(id)
 }
