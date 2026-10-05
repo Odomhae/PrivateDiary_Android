@@ -7,13 +7,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.odom.privatediary.download.OnboardingScreen
 import com.odom.privatediary.pipeline.PipelineScreen
 import com.odom.privatediary.pipeline.PipelineViewModel
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(startDestination: String = "home") {
     val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = "home") {
+    NavHost(navController = nav, startDestination = startDestination) {
+        composable("onboarding") {
+            OnboardingScreen(
+                vm = viewModel(),
+                onReady = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } },
+            )
+        }
         composable("home") {
             HomeScreen(
                 vm = viewModel(),
