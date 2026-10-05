@@ -54,6 +54,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.whisper.android)
     implementation(libs.litertlm.android)
     implementation(libs.android.vad.silero)
