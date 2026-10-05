@@ -55,6 +55,12 @@ adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/sa
 - [ ] 최종 결정: LLM 런타임 = LiteRT-LM 유지 / 변경, 포맷 = `.litertlm`
 - [ ] 위 결론을 `voice-diary-spec.md` §2.2/§2.5/§3에 반영
 
+## 4단계: 모델 다운로드 릴리스 체크리스트 (사용자)
+- `download/R2Config.kt`의 `BASE_URL`을 실제 Cloudflare R2 공개 base URL로 **교체**(현재 플레이스홀더 `https://REPLACE-ME.r2.example/models`).
+- R2에 `manifest.json`(스펙 §3.3 포맷)과 모델 파일 업로드. `name`은 `ggml-small.bin`, `gemma-3n-E2B-it.litertlm`로.
+- 기기에서 확인: 온보딩 다운로드 시작 → 포그라운드 알림 표시(Android 13+ 알림 권한 허용 필요) → 진행률/이어받기/체크섬 통과 → `home` 진입. ~4GB이므로 Wi-Fi 권장.
+- Android 14+ 포그라운드 서비스: `FOREGROUND_SERVICE_DATA_SYNC` 권한은 선언됨. WorkManager 2.10의 `dataSync` 타입 병합이 기기에서 실제로 적용되는지 확인.
+
 ## 참고: 1단계에서 확정된 빌드 환경
 - compileSdk 37, Kotlin 2.4.0 (litertlm 0.17.1이 Kotlin 2.4 stdlib를 요구 → 프로젝트 정렬)
 - 의존성: `dev.ffmpegkit-maintained:whisper-android:1.0.0`, `com.google.ai.edge.litertlm:litertlm-android:0.17.1`

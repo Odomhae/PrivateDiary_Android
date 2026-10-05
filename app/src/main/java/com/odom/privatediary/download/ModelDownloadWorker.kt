@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.os.StatFs
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -25,6 +26,21 @@ class ModelDownloadWorker(
             .getOrElse { return Result.retry() }
 
         val modelsDir = File(ctx.filesDir, "models").apply { mkdirs() }
+
+        // 다운로드 전 여유 공간 선검사(아직 받지 못한 바이트 합계 기준).
+        val required = manifest.models.sumOf { m ->
+            val target = File(modelsDir, m.name)
+            val part = File(modelsDir, m.name + ".part")
+            val have = when {
+                target.exists() -> target.length()
+                part.exists() -> part.length()
+                else -> 0L
+            }
+            (m.bytes - have).coerceAtLeast(0L)
+        }
+        val free = StatFs(ctx.filesDir.path).availableBytes
+        if (!StorageCheck.hasSpaceFor(required, free)) return Result.failure()
+
         for (model in manifest.models) {
             val target = File(modelsDir, model.name)
             if (target.exists() && Sha256.verify(target, model.sha256)) continue

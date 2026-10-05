@@ -1,5 +1,8 @@
 package com.odom.privatediary.download
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +26,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun OnboardingScreen(vm: DownloadViewModel, onReady: () -> Unit) {
     val progress by vm.progress.collectAsStateWithLifecycle(initialValue = 0)
     var wifiOnly by remember { mutableStateOf(true) }
+    // POST_NOTIFICATIONS는 API 33+에서 런타임 요청. 결과와 무관하게 다운로드는 시작한다
+    // (알림이 없어도 다운로드 자체는 진행되므로).
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { vm.start(wifiOnly) }
 
     Column(
         Modifier.fillMaxSize().padding(16.dp),
@@ -33,7 +41,9 @@ fun OnboardingScreen(vm: DownloadViewModel, onReady: () -> Unit) {
             Checkbox(checked = wifiOnly, onCheckedChange = { wifiOnly = it })
             Text("Wi-Fi에서만 다운로드")
         }
-        Button(onClick = { vm.start(wifiOnly) }) { Text("다운로드 시작") }
+        Button(onClick = { notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
+            Text("다운로드 시작")
+        }
         LinearProgressIndicator(progress = { progress / 100f })
         Text("$progress%")
         if (progress >= 100) {
