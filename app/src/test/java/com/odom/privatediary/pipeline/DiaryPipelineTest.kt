@@ -6,6 +6,7 @@ import com.odom.privatediary.bench.Transcriber
 import com.odom.privatediary.bench.TranscriptResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -72,5 +73,19 @@ class DiaryPipelineTest {
         // 실패해도 각 모델은 해제되어야 한다(누수 방지, I1)
         assertTrue(calls.contains("t.release"))
         assertTrue(calls.contains("a.release"))
+    }
+
+    @Test fun rule_crisis_overrides_llm_false() = runTest {
+        val wav = File.createTempFile("pipe", ".wav")
+        val result = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("요즘 죽고 싶어", mutableListOf()), fakeAnalyzer(mutableListOf())) {}
+            .run(ByteArray(4) { 1 }, wav)
+        assertTrue(result.crisis)
+    }
+
+    @Test fun no_crisis_when_rule_and_llm_both_false() = runTest {
+        val wav = File.createTempFile("pipe", ".wav")
+        val result = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("오늘 산책했어", mutableListOf()), fakeAnalyzer(mutableListOf())) {}
+            .run(ByteArray(4) { 1 }, wav)
+        assertFalse(result.crisis)
     }
 }

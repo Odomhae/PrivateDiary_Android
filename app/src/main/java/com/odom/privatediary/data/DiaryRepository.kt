@@ -1,6 +1,7 @@
 package com.odom.privatediary.data
 
 import com.odom.privatediary.bench.AnalysisResult
+import com.odom.privatediary.safety.CrisisDetector
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.time.ZoneId
@@ -33,6 +34,15 @@ class DiaryRepository(
     fun observeEntries(): Flow<List<EntryEntity>> = entryDao.observeAll()
     suspend fun entriesOn(date: String): List<EntryEntity> = entryDao.byDate(date)
     suspend fun entry(id: String): EntryEntity? = entryDao.byId(id)
-    suspend fun updateTranscript(id: String, transcript: String) = entryDao.updateTranscript(id, transcript)
+
+    /** 수정한 전사문도 위기 표현을 재검사한다. 감지는 켜기만 하고 해제하지 않는다. */
+    suspend fun updateTranscript(id: String, transcript: String) {
+        val current = entryDao.byId(id) ?: return
+        entryDao.updateTranscript(id, transcript, current.crisis || CrisisDetector.detect(transcript))
+    }
+
+    suspend fun search(query: String): List<EntryEntity> =
+        SearchQuery.toLikePattern(query)?.let { entryDao.search(it) } ?: emptyList()
+
     suspend fun deleteEntry(id: String) = entryDao.delete(id)
 }

@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# OMC hook state accidentally created under source dirs
+app/**/.omc/

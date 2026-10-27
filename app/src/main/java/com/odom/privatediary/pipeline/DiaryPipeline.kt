@@ -3,6 +3,7 @@ package com.odom.privatediary.pipeline
 import com.odom.privatediary.bench.AnalysisResult
 import com.odom.privatediary.bench.DiaryAnalyzer
 import com.odom.privatediary.bench.Transcriber
+import com.odom.privatediary.safety.CrisisDetector
 import java.io.File
 
 /** 녹음 PCM을 받아 VAD 트리밍 → 전사 → 분석 순서로 처리한다.
@@ -33,6 +34,8 @@ class DiaryPipeline(
             transcriber.release()
         }
         onTranscript(transcript.text)
+        // 규칙 기반 위기 감지가 1차, LLM crisis는 보조 (스펙 §5.3).
+        val ruleCrisis = CrisisDetector.detect(transcript.text)
 
         onStage(PipelineStage.Analyzing)
         val result = try {
@@ -43,6 +46,6 @@ class DiaryPipeline(
         }
 
         onStage(PipelineStage.Done)
-        return result
+        return result.copy(crisis = ruleCrisis || result.crisis)
     }
 }
