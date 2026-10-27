@@ -42,7 +42,7 @@ fun DetailScreen(
             Text("${e.date} · ${e.emotion ?: "분석 전"} ${e.intensity?.let { "(강도 $it)" } ?: ""}")
             e.summary?.let { Text("요약: $it") }
             if (e.keywords.isNotEmpty()) Text("태그: ${e.keywords.joinToString(", ")}")
-            e.reply?.let { Text("공감: $it") }
+            if (e.crisis) CrisisNotice() else e.reply?.let { Text("공감: $it") }
 
             var text by remember(e.id) { mutableStateOf(e.transcript) }
             OutlinedTextField(

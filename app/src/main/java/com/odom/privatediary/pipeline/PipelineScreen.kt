@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.odom.privatediary.ui.CrisisNotice
 
 @Composable
 fun PipelineScreen(vm: PipelineViewModel) {
@@ -46,7 +47,7 @@ fun PipelineScreen(vm: PipelineViewModel) {
             Text("요약: ${it.summary}")
             Text("감정: ${it.emotion} (강도 ${it.intensity})")
             Text("태그: ${it.keywords.joinToString(", ")}")
-            Text("공감: ${it.reply}")
+            if (it.crisis) CrisisNotice() else Text("공감: ${it.reply}")
         }
         state.error?.let { Text("오류: $it") }
     }

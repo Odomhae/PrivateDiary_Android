@@ -27,6 +27,7 @@ fun OnboardingScreen(vm: DownloadViewModel, onReady: () -> Unit) {
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Text("이 앱은 상담이나 진단을 하지 않습니다. 위급할 때는 자살예방 상담전화 109로 연락하세요.")
         Text("음성 일기를 쓰려면 온디바이스 AI 모델이 필요합니다 (약 1.1GB). Play 스토어가 설치 직후 자동으로 받아 둡니다.")
         when (val s = state) {
             PackUiState.Checking -> Text("모델 상태 확인 중…")

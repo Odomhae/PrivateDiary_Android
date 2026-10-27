@@ -26,7 +26,15 @@ fun AppNavHost(startDestination: String = "home") {
                 vm = viewModel(),
                 onRecord = { nav.navigate("record") },
                 onCalendar = { nav.navigate("calendar") },
+                onSearch = { nav.navigate("search") },
                 onEntry = { id -> nav.navigate("detail/$id") },
+            )
+        }
+        composable("search") {
+            SearchScreen(
+                vm = viewModel(),
+                onEntry = { id -> nav.navigate("detail/$id") },
+                onBack = { nav.popBackStack() },
             )
         }
         composable("record") {
