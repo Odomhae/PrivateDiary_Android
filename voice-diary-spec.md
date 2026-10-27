@@ -78,20 +78,18 @@ feature/settings/    -- 설정, 잠금, 내보내기
 - 대안: SenseVoice Small (더 빠르고 목소리에서 감정 태그 추출 가능, 한국어 정확도는 Whisper가 약간 우세)
 
 ### 3.2 요약 + 감정 분석: Gemma 4 E2B
+- **변경(PAD 전환)**: AI pack 팩당 1.5GB 한도로 Gemma 4 E2B(.litertlm 2.0~2.6GB)는 단일 팩에 들어가지 않음 → 현재는 **Gemma 3 1B IT int4** (`gemma3-1b-it-int4.litertlm`, 약 584MB, Gemma 약관). 한국어 분석 품질 재측정 필요
 - 실행 시 RAM 약 2GB
 - 전사문을 입력받아 요약·감정·태그를 **JSON 한 번에** 출력 (3.4 스키마)
 - 별도 감정 분류 모델은 두지 않음
 
 ### 3.3 모델 배포
-- 저장소: **Cloudflare R2, Standard 스토리지** (Infrequent Access는 무료 한도 미적용이므로 사용 금지)
-- 무료 한도: 저장 10GB/월, 다운로드 전송량 무료, 읽기 요청 1,000만 건/월
-- 앱 첫 실행 시 다운로드, 앱 번들에는 포함하지 않음
-- 구현 요구사항
-  - 이어받기 지원 (Range 요청). 조각 크기는 크게 잡을 것 — 조각 하나가 요청 1건으로 과금됨
-  - "Wi-Fi에서만 다운로드" 옵션, 기본값 켜짐
-  - 다운로드 후 체크섬(SHA-256) 검증
-  - 진행률 표시, 저장 공간 부족 시 안내
-  - 모델 버전 관리 (버전 매니페스트 JSON을 R2에 함께 둠)
+- **Play Asset Delivery — AI pack (Play for On-device AI)**, 전달 방식 **fast-follow** (설치 직후 Play가 자동으로 받음)
+  - 팩: `whisper_pack`(Whisper), `gemma_pack`(LLM). 앱 기본 APK에는 포함하지 않음
+  - 한도: 팩당 압축 1.5GB, 앱 전체 4GB → LLM은 1.5GB 이하 모델만 사용 가능
+  - 이어받기·무결성·버전 관리는 Play가 담당 (앱 업데이트 시 팩도 함께 갱신). 앱은 INTERNET 권한 없음
+  - 앱 구현: 온보딩에서 팩 상태·진행률 표시, 미설치 시 `fetch`, Wi-Fi 대기/모바일 데이터는 Play 확인 대화상자, 저장 공간 부족 등 오류 안내
+  - (이전 안: Cloudflare R2 직접 다운로드 — 폐기)
 
 ### 3.4 LLM 출력 스키마
 

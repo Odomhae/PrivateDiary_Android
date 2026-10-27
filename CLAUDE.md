@@ -13,7 +13,7 @@ This is a **fresh Android Studio Compose template** (just `MainActivity` + `ui/t
 Non-negotiable constraints from the spec that shape every design decision:
 
 - **Fully on-device.** Audio, transcripts, and analysis never leave the device. There is no backend.
-- **The only network call is model-file download** (first run, from Cloudflare R2). No analytics, logging, or telemetry.
+- **The app makes no network calls.** Models ship as Play AI packs (`:whisper_pack`, `:gemma_pack`, fast-follow) downloaded by the Play Store; there is no INTERNET permission. No analytics, logging, or telemetry. AI packs are capped at 1.5GB each — this is why the LLM is Gemma 3 1B int4.
 - **Zero inference cost** — all models run locally on the user's device.
 - **arm64-v8a only.** Models live in internal storage (`filesDir`), never external storage.
 - **Never load Whisper and Gemma into memory at the same time** — release one before loading the other (see pipeline in spec §4).

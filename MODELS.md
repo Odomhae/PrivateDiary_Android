@@ -4,19 +4,20 @@
 
 ## 1. 모델 내려받기
 - **Whisper Small ggml**: whisper.cpp 모델 저장소에서 `ggml-small.bin` (약 466MB~). 파일명을 `ggml-small.bin`으로 둔다.
-- **Gemma 3n E2B (LiteRT-LM)**: HuggingFace `google/gemma-3n-E2B-it-litert-lm`
-  (약 3.7GB, 실행 시 RAM 약 8GB). 받은 `.litertlm` 파일명을 `gemma-3n-E2B-it.litertlm`으로 둔다.
+- **Gemma 3 1B IT int4 (LiteRT-LM)**: HuggingFace `litert-community/Gemma3-1B-IT`의 `gemma3-1b-it-int4.litertlm` (약 584MB).
+  Play AI pack 한도(팩당 1.5GB) 때문에 Gemma 3n/4 E2B(2.0~3.7GB) 대신 이 모델을 쓴다. 라이선스는 Gemma 약관.
 
-> 코드의 모델 경로(`ModelPaths`)는 `files/models/ggml-small.bin`, `files/models/gemma-3n-E2B-it.litertlm`을 기대한다. 파일명이 다르면 맞춰 바꾸거나 `ModelPaths.kt`를 수정한다.
+> `ModelPaths`는 Play AI pack(`whisper_pack`, `gemma_pack`)의 assets 경로를 먼저 보고, 없으면 `files/models/`(adb 사이드로드)를 쓴다.
+> Android Studio `installDebug`로 설치하면 팩이 같이 설치되지 않으므로 개발 중에는 아래 2번의 사이드로드를 쓰거나 bundletool `--local-testing`을 쓴다.
 
 ## 2. 기기로 push (앱 1회 설치 후)
 ```bash
 adb shell run-as com.odom.privatediary mkdir -p files/models files/samples
 # 모델
 adb push ggml-small.bin /data/local/tmp/
-adb push gemma-3n-E2B-it.litertlm /data/local/tmp/
+adb push gemma3-1b-it-int4.litertlm /data/local/tmp/
 adb shell "run-as com.odom.privatediary cp /data/local/tmp/ggml-small.bin files/models/"
-adb shell "run-as com.odom.privatediary cp /data/local/tmp/gemma-3n-E2B-it.litertlm files/models/"
+adb shell "run-as com.odom.privatediary cp /data/local/tmp/gemma3-1b-it-int4.litertlm files/models/"
 # 한국어 녹음 10개 (WAV/MP3/FLAC 가능, 자동 16kHz 리샘플). sample01.wav ~ sample10.wav
 adb push sample01.wav /data/local/tmp/
 adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/samples/"
@@ -55,13 +56,17 @@ adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/sa
 - [ ] 최종 결정: LLM 런타임 = LiteRT-LM 유지 / 변경, 포맷 = `.litertlm`
 - [ ] 위 결론을 `voice-diary-spec.md` §2.2/§2.5/§3에 반영
 
-## 4단계: 모델 다운로드 릴리스 체크리스트 (사용자)
-- `download/R2Config.kt`의 `BASE_URL`을 실제 Cloudflare R2 공개 base URL로 **교체**(현재 플레이스홀더 `https://REPLACE-ME.r2.example/models`).
-- R2에 `manifest.json`(스펙 §3.3 포맷)과 모델 파일 업로드. `name`은 `ggml-small.bin`, `gemma-3n-E2B-it.litertlm`로.
-- 기기에서 확인: 온보딩 다운로드 시작 → 포그라운드 알림 표시(Android 13+ 알림 권한 허용 필요) → 진행률/이어받기/체크섬 통과 → `home` 진입. ~4GB이므로 Wi-Fi 권장.
-- Android 14+ 포그라운드 서비스: `FOREGROUND_SERVICE_DATA_SYNC` 권한은 선언됨. WorkManager 2.10의 `dataSync` 타입 병합이 기기에서 실제로 적용되는지 확인.
+## 4단계: 모델 배포 — Play AI pack (fast-follow)
+R2 다운로드는 Play for On-device AI(AI pack)로 대체했다. 앱은 네트워크 권한이 없고, 다운로드·무결성 검증은 Play 스토어가 한다.
+- 빌드 전에 모델 파일을 팩 모듈에 넣는다(커밋 금지, `.gitignore` 처리됨):
+  - `whisper_pack/src/main/assets/ggml-small.bin`
+  - `gemma_pack/src/main/assets/gemma3-1b-it-int4.litertlm`
+- 팩당 압축 기준 1.5GB, 앱 전체 4GB 한도. 더 큰 모델로 바꾸려면 파일 분할·재조립이 필요하다.
+- `./gradlew :app:bundleRelease`로 AAB를 만들어 Play Console에 올린다(APK로는 팩이 전달되지 않음).
+- 로컬 확인: `bundletool build-apks --bundle=app-release.aab --output=app.apks --local-testing` → `bundletool install-apks --apks=app.apks` (bundletool 1.18.0+). local-testing에서는 fast-follow가 on-demand처럼 동작하므로 온보딩의 fetch가 실제로 요청한다.
+- 기기에서 확인: 온보딩 진행률 → (모바일 데이터면) "모바일 데이터로 받기" 확인 대화상자 → `home` 진입.
 
 ## 참고: 1단계에서 확정된 빌드 환경
 - compileSdk 37, Kotlin 2.4.0 (litertlm 0.17.1이 Kotlin 2.4 stdlib를 요구 → 프로젝트 정렬)
-- 의존성: `dev.ffmpegkit-maintained:whisper-android:1.0.0`, `com.google.ai.edge.litertlm:litertlm-android:0.17.1`
+- 의존성: `dev.ffmpegkit-maintained:whisper-android:1.0.0`, `com.google.ai.edge.litertlm:litertlm-android:0.17.1`, `com.google.android.play:ai-delivery:0.2.0-beta01`
 - ABI: arm64-v8a only

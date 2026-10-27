@@ -1,53 +1,51 @@
 package com.odom.privatediary.download
 
-import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun OnboardingScreen(vm: DownloadViewModel, onReady: () -> Unit) {
-    val progress by vm.progress.collectAsStateWithLifecycle(initialValue = 0)
-    var wifiOnly by remember { mutableStateOf(true) }
-    // POST_NOTIFICATIONS는 API 33+에서 런타임 요청. 결과와 무관하게 다운로드는 시작한다
-    // (알림이 없어도 다운로드 자체는 진행되므로).
-    val notifPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { vm.start(wifiOnly) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    // Play 확인 대화상자(모바일 데이터 사용 등). 결과와 무관하게 상태를 다시 조회한다.
+    val confirmLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { vm.refresh() }
 
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("음성 일기를 쓰려면 온디바이스 AI 모델을 먼저 받아야 합니다 (약 4GB).")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = wifiOnly, onCheckedChange = { wifiOnly = it })
-            Text("Wi-Fi에서만 다운로드")
-        }
-        Button(onClick = { notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
-            Text("다운로드 시작")
-        }
-        LinearProgressIndicator(progress = { progress / 100f })
-        Text("$progress%")
-        if (progress >= 100) {
-            Button(onClick = onReady) { Text("시작하기") }
+        Text("음성 일기를 쓰려면 온디바이스 AI 모델이 필요합니다 (약 1.1GB). Play 스토어가 설치 직후 자동으로 받아 둡니다.")
+        when (val s = state) {
+            PackUiState.Checking -> Text("모델 상태 확인 중…")
+            PackUiState.NotStarted -> Button(onClick = vm::fetch) { Text("다운로드 시작") }
+            is PackUiState.Downloading -> {
+                LinearProgressIndicator(progress = { s.percent / 100f })
+                Text("${s.percent}%")
+            }
+            PackUiState.WaitingForWifi -> {
+                Text("Wi-Fi 연결을 기다리는 중입니다.")
+                Button(onClick = { vm.confirm(confirmLauncher) }) { Text("모바일 데이터로 받기") }
+            }
+            PackUiState.NeedsConfirmation ->
+                Button(onClick = { vm.confirm(confirmLauncher) }) { Text("다운로드 허용") }
+            is PackUiState.Failed -> {
+                Text(s.message)
+                Button(onClick = vm::fetch) { Text("다시 시도") }
+            }
+            PackUiState.Ready -> Button(onClick = onReady) { Text("시작하기") }
         }
     }
 }
