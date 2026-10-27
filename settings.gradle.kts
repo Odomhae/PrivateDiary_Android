@@ -25,4 +25,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "PrivateDiary"
 include(":app")
+include(":whisper_pack")
+include(":gemma_pack")
  

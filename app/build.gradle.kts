@@ -38,6 +38,8 @@ android {
     buildFeatures {
         compose = true
     }
+    // 모델은 Play AI pack(fast-follow)으로 배포. 팩당 1.5GB 한도.
+    assetPacks += setOf(":whisper_pack", ":gemma_pack")
 }
 
 dependencies {
@@ -54,8 +56,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.okhttp)
-    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.play.ai.delivery)
     implementation(libs.whisper.android)
     implementation(libs.litertlm.android)
     implementation(libs.android.vad.silero)
