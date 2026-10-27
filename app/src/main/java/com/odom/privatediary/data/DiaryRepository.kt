@@ -3,6 +3,7 @@ package com.odom.privatediary.data
 import com.odom.privatediary.bench.AnalysisResult
 import com.odom.privatediary.safety.CrisisDetector
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -35,14 +36,13 @@ class DiaryRepository(
     suspend fun entriesOn(date: String): List<EntryEntity> = entryDao.byDate(date)
     suspend fun entry(id: String): EntryEntity? = entryDao.byId(id)
 
-    /** 수정한 전사문도 위기 표현을 재검사한다. 감지는 켜기만 하고 해제하지 않는다. */
-    suspend fun updateTranscript(id: String, transcript: String) {
-        val current = entryDao.byId(id) ?: return
-        entryDao.updateTranscript(id, transcript, current.crisis || CrisisDetector.detect(transcript))
-    }
+    /** 수정한 전사문도 위기 표현을 재검사한다. 감지는 켜기만 하고 해제하지 않는다(DAO가 OR). */
+    suspend fun updateTranscript(id: String, transcript: String) =
+        entryDao.updateTranscript(id, transcript, CrisisDetector.detect(transcript))
 
-    suspend fun search(query: String): List<EntryEntity> =
-        SearchQuery.toLikePattern(query)?.let { entryDao.search(it) } ?: emptyList()
+    /** DB 변경(삭제·수정)에 반응하는 검색 결과. 빈 검색어는 빈 리스트. */
+    fun search(query: String): Flow<List<EntryEntity>> =
+        SearchQuery.toLikePattern(query)?.let { entryDao.search(it) } ?: flowOf(emptyList())
 
     suspend fun deleteEntry(id: String) = entryDao.delete(id)
 }

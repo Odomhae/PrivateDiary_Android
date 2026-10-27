@@ -61,18 +61,24 @@ class DiaryPipelineTest {
         assertTrue(calls.contains("a.analyze:오늘 피곤"))
     }
 
-    @Test fun analyzer_failure_propagates_without_done() = runTest {
-        val stages = mutableListOf<PipelineStage>()
+    @Test fun analyzer_failure_returns_failed_result_and_releases() = runTest {
         val calls = mutableListOf<String>()
         val wav = File.createTempFile("pipe", ".wav")
-        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("x", calls), fakeAnalyzer(calls, throwIt = true), onStage = { stages += it })
-        var threw = false
-        try { pipeline.run(ByteArray(4) { 1 }, wav) } catch (e: Exception) { threw = true }
-        assertTrue(threw)
-        assertTrue(!stages.contains(PipelineStage.Done))
+        val pipeline = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("x", calls), fakeAnalyzer(calls, throwIt = true))
+        val result = pipeline.run(ByteArray(4) { 1 }, wav)
+        assertFalse(result.parseOk)
+        assertFalse(result.crisis)
         // 실패해도 각 모델은 해제되어야 한다(누수 방지, I1)
         assertTrue(calls.contains("t.release"))
         assertTrue(calls.contains("a.release"))
+    }
+
+    @Test fun rule_crisis_survives_analyzer_failure() = runTest {
+        val wav = File.createTempFile("pipe", ".wav")
+        val result = DiaryPipeline(passVad, SilenceTrimmer(), fakeTranscriber("죽고 싶어", mutableListOf()), fakeAnalyzer(mutableListOf(), throwIt = true))
+            .run(ByteArray(4) { 1 }, wav)
+        assertFalse(result.parseOk)
+        assertTrue(result.crisis)
     }
 
     @Test fun rule_crisis_overrides_llm_false() = runTest {

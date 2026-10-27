@@ -38,16 +38,18 @@ fun SearchScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        if (query.isNotBlank() && results.isEmpty()) Text("결과 없음")
+        // 결과를 만든 검색어(results.query) 기준으로 표시한다 — 입력 중인 query와 다를 수 있다.
+        val searched = results.query
+        if (searched.isNotBlank() && searched == query && results.entries.isEmpty()) Text("결과 없음")
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(results, key = { it.id }) { e ->
+            items(results.entries, key = { it.id }) { e ->
                 // 전사문에 일치하면 전사문, 아니면(요약에서 일치) 요약에서 스니펫을 만든다.
-                val source = if (e.transcript.contains(query.trim(), ignoreCase = true)) e.transcript
+                val source = if (e.transcript.contains(searched.trim(), ignoreCase = true)) e.transcript
                 else e.summary ?: e.transcript
                 Card(Modifier.fillMaxWidth().clickable { onEntry(e.id) }) {
                     Column(Modifier.padding(12.dp)) {
                         Text("${e.date} · ${e.emotion ?: "분석 전"}")
-                        Text(SearchSnippet.around(source, query))
+                        Text(SearchSnippet.around(source, searched))
                     }
                 }
             }

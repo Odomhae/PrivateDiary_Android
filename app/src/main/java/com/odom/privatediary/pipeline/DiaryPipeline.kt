@@ -3,7 +3,9 @@ package com.odom.privatediary.pipeline
 import com.odom.privatediary.bench.AnalysisResult
 import com.odom.privatediary.bench.DiaryAnalyzer
 import com.odom.privatediary.bench.Transcriber
+import com.odom.privatediary.bench.DiaryJson
 import com.odom.privatediary.safety.CrisisDetector
+import kotlinx.coroutines.CancellationException
 import java.io.File
 
 /** 녹음 PCM을 받아 VAD 트리밍 → 전사 → 분석 순서로 처리한다.
@@ -38,9 +40,15 @@ class DiaryPipeline(
         val ruleCrisis = CrisisDetector.detect(transcript.text)
 
         onStage(PipelineStage.Analyzing)
+        // 분석 엔진 실패(로드 OOM 등)에도 전사문과 규칙 기반 위기 감지는 살린다:
+        // 전사문만 저장하고 analysis_status=failed (스펙 §3.4 실패 처리).
         val result = try {
             analyzer.load()
             analyzer.analyze(transcript.text)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            DiaryJson.failed("analyzer error: ${e.message}")
         } finally {
             analyzer.release()
         }

@@ -25,14 +25,16 @@
 ## 3. 위기 대응
 ### 3.1 `safety/CrisisDetector` (순수 object)
 - `normalize(text)`: 문자(Letter)·숫자 외 모든 문자(공백·문장부호 등) 제거
-- `PHRASES` (공백 제거 후 전체 텍스트에서 부분 일치): 죽고싶, 죽어버리고싶, 극단적선택, 목숨을끊, 목을매, 손목을긋, 뛰어내리고싶, 살기싫, 사라지고싶, 없어지고싶, 생을마감
-- `WORDS` (어절 단위 부분 일치 — 공백을 지우면 "여자 살"→"여자살"처럼 단어 경계를 넘어 오탐하므로): 자살, 자해, 유서
+- `PHRASES` (NFC 정규화 + 공백 제거 후 전체 텍스트에서 부분 일치): 죽고싶, 죽고만싶, 죽어버리고싶, 죽어버릴까, 살고싶지않, 극단적선택, 목숨을끊, 목을매달, 목매달, 손목을긋, 뛰어내리고싶, 살기싫, 사라지고싶, 없어지고싶, 생을마감, 유서를쓰, 유서를써, 유서를남기, 유서써, 번개탄
+- `WORDS` (어절 단위 부분 일치 — 공백을 지우면 "여자 살"→"여자살"처럼 단어 경계를 넘어 오탐하므로): 자살, 자해
+- 리뷰 반영: "유서"(→"유서 깊은" 오탐)·"목을매"(→"목을 매일" 오탐)는 동사 결합형으로 좁힘. "끝내고 싶다"는 사용자 결정으로 계속 제외
 - `detect(text)` = 정규화 텍스트가 PHRASES 중 하나를 포함하거나, 공백으로 나눈 어절(문장부호 제거) 중 하나가 WORDS 중 하나를 포함
 - 부정문("죽고 싶진 않아")도 감지됨 — 안전 쪽 오탐으로 감수. "끝내고 싶다"처럼 일상 표현과 겹치는 말은 제외
 
 ### 3.2 파이프라인
 `DiaryPipeline.run`: 전사 → `ruleCrisis = CrisisDetector.detect(text)` → Gemma 분석 → `result.copy(crisis = ruleCrisis || result.crisis)`.
 Gemma 분석은 요약·감정이 필요하므로 감지 여부와 무관하게 실행한다. 저장은 기존대로 진행.
+분석 엔진이 예외를 던져도(로드 OOM 등) 파이프라인은 `parseOk=false` 결과(`crisis = ruleCrisis`)를 반환해 전사문만 저장(failed)하고 위기 안내를 표시한다.
 
 ### 3.3 표시
 - `ui/CrisisNotice.kt`: 고정 문구
@@ -42,7 +44,7 @@ Gemma 분석은 요약·감정이 필요하므로 감지 여부와 무관하게 
 
 ### 3.4 전사 수정
 `DiaryRepository.updateTranscript(id, text)`: 기존 엔트리를 읽어 `crisis = 기존 || detect(text)`로 함께 저장.
-`EntryDao.updateTranscript(id, transcript, crisis)`로 시그니처 변경. 감지는 켜기만 하고 해제하지 않는다.
+`EntryDao.updateTranscript(id, transcript, crisis)`는 SQL에서 `crisis = (crisis OR :crisis)` — 감지는 켜기만 하고, 읽기-쓰기 경합 없음.
 
 ### 3.5 온보딩
 "이 앱은 상담이나 진단을 하지 않습니다. 위급할 때는 자살예방 상담전화 109로 연락하세요." 한 줄.
@@ -51,9 +53,9 @@ Gemma 분석은 요약·감정이 필요하므로 감지 여부와 무관하게 
 - `data/SearchQuery.toLikePattern(q): String?` — trim, 빈 문자열이면 null, `\`→`\\`, `%`→`\%`, `_`→`\_`, 앞뒤 `%`
 - `EntryDao.search(pattern)`:
   `SELECT * FROM entries WHERE transcript LIKE :pattern ESCAPE '\' OR summary LIKE :pattern ESCAPE '\' ORDER BY created_at DESC`
-- `DiaryRepository.search(q): List<EntryEntity>` — 패턴이 null이면 빈 리스트
+- `DiaryRepository.search(q): Flow<List<EntryEntity>>` — 패턴이 null이면 `flowOf(emptyList())`
 - `ui/SearchSnippet.around(text, q, radius = 20): String` — 대소문자 무시로 첫 일치 위치 앞뒤 `radius`자, 잘린 쪽에 `…`. 일치 없으면 앞 `2*radius`자
-- `ui/SearchViewModel`: `query` StateFlow → 300ms debounce → `repo.search` → `results`
+- `ui/SearchViewModel`: `query` StateFlow → 300ms debounce → `flatMapLatest { repo.search(q) }` (DAO가 `Flow` 반환, 삭제·수정 반영) → `SearchResults(query, entries)` (결과를 만든 검색어와 함께)
 - `ui/SearchScreen`: 입력창 + 결과 목록(날짜 · 감정 · 스니펫, 전사문에 없으면 요약 기준), 항목 탭 → `detail/{id}`, 뒤로
 - `HomeScreen`에 [검색] 버튼, `AppNavHost`에 `search` 경로
 

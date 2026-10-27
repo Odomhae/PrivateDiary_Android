@@ -49,7 +49,7 @@ object DiaryJson {
         }
     }
 
-    private fun failed(raw: String) = AnalysisResult(
+    fun failed(raw: String) = AnalysisResult(
         summary = "", emotion = null, intensity = 1, causes = emptyList(),
         keywords = emptyList(), reply = "", crisis = false, raw = raw, parseOk = false,
     )

@@ -2,6 +2,7 @@ package com.odom.privatediary.data
 
 import com.odom.privatediary.bench.AnalysisResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -20,10 +21,11 @@ class DiaryRepositoryTest {
         override fun observeAll(): Flow<List<EntryEntity>> = flowOf(upserted.toList())
         override suspend fun updateTranscript(id: String, transcript: String, crisis: Boolean) {
             val i = upserted.indexOfFirst { it.id == id }
-            if (i >= 0) upserted[i] = upserted[i].copy(transcript = transcript, crisis = crisis)
+            // 실제 쿼리와 같이 crisis = (crisis OR :crisis)
+            if (i >= 0) upserted[i] = upserted[i].copy(transcript = transcript, crisis = upserted[i].crisis || crisis)
         }
         val searched = mutableListOf<String>()
-        override suspend fun search(pattern: String): List<EntryEntity> { searched += pattern; return upserted.toList() }
+        override fun search(pattern: String): Flow<List<EntryEntity>> { searched += pattern; return flowOf(upserted.toList()) }
         override suspend fun delete(id: String) { deleted += id }
     }
 
@@ -90,7 +92,7 @@ class DiaryRepositoryTest {
 
     @Test fun search_blank_query_skips_dao() = runTest {
         val dao = FakeEntryDao()
-        assertTrue(DiaryRepository(dao).search("   ").isEmpty())
+        assertTrue(DiaryRepository(dao).search("   ").first().isEmpty())
         assertTrue(dao.searched.isEmpty())
     }
 
