@@ -20,6 +20,10 @@ interface EntryDao {
     @Query("SELECT * FROM entries ORDER BY created_at DESC")
     fun observeAll(): Flow<List<EntryEntity>>
 
+    /** [start]~[end] (ISO `yyyy-MM-dd`, 양끝 포함). 문자열 비교로 날짜 순서가 맞는다. */
+    @Query("SELECT * FROM entries WHERE date >= :start AND date <= :end ORDER BY created_at")
+    fun between(start: String, end: String): Flow<List<EntryEntity>>
+
     /** crisis는 SQL에서 OR — 기존 감지를 해제하지 않고, 읽기-쓰기 경합도 없다. */
     @Query("UPDATE entries SET transcript = :transcript, crisis = (crisis OR :crisis) WHERE id = :id")
     suspend fun updateTranscript(id: String, transcript: String, crisis: Boolean)

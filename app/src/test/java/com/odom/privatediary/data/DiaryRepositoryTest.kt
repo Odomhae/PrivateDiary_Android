@@ -19,6 +19,8 @@ class DiaryRepositoryTest {
         override suspend fun byId(id: String) = upserted.find { it.id == id }
         override suspend fun byDate(date: String) = upserted.filter { it.date == date }
         override fun observeAll(): Flow<List<EntryEntity>> = flowOf(upserted.toList())
+        override fun between(start: String, end: String): Flow<List<EntryEntity>> =
+            flowOf(upserted.filter { it.date in start..end })
         override suspend fun updateTranscript(id: String, transcript: String, crisis: Boolean) {
             val i = upserted.indexOfFirst { it.id == id }
             // 실제 쿼리와 같이 crisis = (crisis OR :crisis)

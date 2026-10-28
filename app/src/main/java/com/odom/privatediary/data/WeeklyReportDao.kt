@@ -13,4 +13,7 @@ interface WeeklyReportDao {
 
     @Query("SELECT * FROM weekly_reports ORDER BY created_at DESC")
     fun observeAll(): Flow<List<WeeklyReportEntity>>
+
+    @Query("SELECT * FROM weekly_reports WHERE week_start = :weekStart ORDER BY created_at DESC LIMIT 1")
+    fun byWeek(weekStart: String): Flow<WeeklyReportEntity?>
 }
