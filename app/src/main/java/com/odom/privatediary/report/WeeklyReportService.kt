@@ -1,5 +1,6 @@
 package com.odom.privatediary.report
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.odom.privatediary.bench.LiteRtTextGenerator
 import com.odom.privatediary.bench.ModelPaths
@@ -72,6 +73,8 @@ class WeeklyReportService private constructor(context: Context) {
     }
 
     companion object {
+        // applicationContext만 보관하므로 Activity 누수가 아니다.
+        @SuppressLint("StaticFieldLeak")
         @Volatile private var instance: WeeklyReportService? = null
 
         fun get(context: Context): WeeklyReportService = instance ?: synchronized(this) {

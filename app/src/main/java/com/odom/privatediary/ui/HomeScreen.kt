@@ -25,6 +25,7 @@ fun HomeScreen(
     onRecord: () -> Unit,
     onCalendar: () -> Unit,
     onSearch: () -> Unit,
+    onReport: () -> Unit,
     onEntry: (String) -> Unit,
 ) {
     val entries by vm.entries.collectAsStateWithLifecycle()
@@ -38,6 +39,7 @@ fun HomeScreen(
             Button(onClick = onRecord) { Text("녹음") }
             OutlinedButton(onClick = onCalendar) { Text("캘린더") }
             OutlinedButton(onClick = onSearch) { Text("검색") }
+            OutlinedButton(onClick = onReport) { Text("리포트") }
         }
         Text("최근 일기")
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

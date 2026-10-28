@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import com.odom.privatediary.download.OnboardingScreen
 import com.odom.privatediary.pipeline.PipelineScreen
 import com.odom.privatediary.pipeline.PipelineViewModel
+import com.odom.privatediary.report.ReportScreen
 
 @Composable
 fun AppNavHost(startDestination: String = "home") {
@@ -27,8 +28,12 @@ fun AppNavHost(startDestination: String = "home") {
                 onRecord = { nav.navigate("record") },
                 onCalendar = { nav.navigate("calendar") },
                 onSearch = { nav.navigate("search") },
+                onReport = { nav.navigate("report") },
                 onEntry = { id -> nav.navigate("detail/$id") },
             )
+        }
+        composable("report") {
+            ReportScreen(vm = viewModel(), onBack = { nav.popBackStack() })
         }
         composable("search") {
             SearchScreen(
