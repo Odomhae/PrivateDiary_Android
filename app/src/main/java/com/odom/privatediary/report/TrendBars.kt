@@ -26,8 +26,9 @@ fun TrendBars(days: List<DayPoint>, modifier: Modifier = Modifier) {
             val barWidth = slot * 0.6f
             days.forEachIndexed { i, d ->
                 val left = i * slot + (slot - barWidth) / 2
-                val intensity = d.intensity
-                if (d.emotion != null && intensity != null) {
+                if (d.emotion != null) {
+                    // 강도가 없으면 중간 높이(3)로 그려 횟수 집계와 어긋나지 않게 한다.
+                    val intensity = d.intensity ?: 3
                     val h = size.height * (intensity / maxIntensity).coerceIn(0.1f, 1f)
                     drawRoundRect(
                         color = Color(EmotionPalette.argb(d.emotion)),

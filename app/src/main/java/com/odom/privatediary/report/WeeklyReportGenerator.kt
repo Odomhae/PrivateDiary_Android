@@ -26,9 +26,10 @@ class WeeklyReportGenerator(
         onRunning: () -> Unit = {},
     ): Outcome {
         val start = weekStart.toString()
-        val prompt = WeeklyReportPrompt.build(entries(start, Week.end(weekStart).toString()))
-            ?: return Outcome.NoEntries
+        // 엔트리는 게이트 안에서 읽는다 — 대기하는 동안 저장된 방금 녹음한 일기도 포함되도록.
         val raw = gate.withModel(onWait) {
+            val prompt = WeeklyReportPrompt.build(entries(start, Week.end(weekStart).toString()))
+                ?: return@withModel null
             onRunning()
             val generator = generatorFactory()
             try {
@@ -37,7 +38,7 @@ class WeeklyReportGenerator(
             } finally {
                 generator.release()
             }
-        }
+        } ?: return Outcome.NoEntries
         val body = ReportBody.clean(raw) ?: error("빈 회고가 생성됐습니다")
         val report = WeeklyReportEntity(id = "week-$start", weekStart = start, body = body, createdAt = now())
         save(report)

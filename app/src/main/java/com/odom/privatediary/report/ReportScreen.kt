@@ -28,9 +28,12 @@ private val MD = DateTimeFormatter.ofPattern("MM/dd")
 @Composable
 fun ReportScreen(vm: ReportViewModel, onBack: () -> Unit) {
     val week by vm.week.collectAsStateWithLifecycle()
-    val entries by vm.entries.collectAsStateWithLifecycle()
-    val report by vm.report.collectAsStateWithLifecycle()
+    val data by vm.data.collectAsStateWithLifecycle()
     val job by vm.job.collectAsStateWithLifecycle()
+    // 아직 새 주 데이터가 오지 않았으면 비운 채로 그린다(이전 주 내용 노출 방지).
+    val current = data.takeIf { it.week == week } ?: WeekData(week)
+    val entries = current.entries
+    val report = current.report
     val trend = remember(week, entries) { WeeklyTrend.of(week, entries) }
 
     Column(

@@ -3,6 +3,8 @@ package com.odom.privatediary.report
 import com.odom.privatediary.bench.TextGenerator
 import com.odom.privatediary.data.WeeklyReportEntity
 import com.odom.privatediary.pipeline.ModelGate
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -60,6 +62,21 @@ class WeeklyReportGeneratorTest {
         assertTrue(r.isFailure)
         assertEquals(listOf("load", "generate", "release"), fake.calls)
         assertTrue(saved.isEmpty())
+    }
+
+    @Test fun entries_are_read_after_gate_opens() = runTest {
+        val gate = ModelGate()
+        val log = mutableListOf<String>()
+        val gen = WeeklyReportGenerator(
+            entries = { _, _ -> log += "read"; listOf(entry("2026-10-20")) },
+            save = {},
+            generatorFactory = { FakeGenerator { "본문" } },
+            gate = gate,
+        )
+        launch { gate.withModel { log += "pipeline-in"; delay(100); log += "pipeline-out" } }
+        launch { gen.generate(mon, onWait = { log += "wait" }) }
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf("pipeline-in", "wait", "pipeline-out", "read"), log)
     }
 
     @Test fun blank_output_is_a_failure() = runTest {

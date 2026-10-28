@@ -43,17 +43,22 @@ class PipelineViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val pcm = recorder.record()
                 val app = getApplication<Application>()
-                val pipeline = DiaryPipeline(
-                    vad = SileroVad(app),
-                    trimmer = SilenceTrimmer(),
-                    transcriber = WhisperTranscriber(app, paths.whisperModel.absolutePath),
-                    analyzer = LiteRtDiaryAnalyzer(paths.gemmaModel.absolutePath, app.cacheDir.absolutePath),
-                    onStage = { s -> _state.value = _state.value.copy(stage = s) },
-                    onTranscript = { text -> _state.value = _state.value.copy(transcript = text) },
-                )
                 val workWav = File(File(app.filesDir, "recordings"), "last.wav")
-                // 회고 생성 등 다른 모델 작업과 겹치지 않게 공용 게이트 안에서 실행
-                val result = withContext(dispatcher) { ModelGate.shared.withModel { pipeline.run(pcm, workWav) } }
+                val onStage = { s: PipelineStage -> _state.value = _state.value.copy(stage = s) }
+                // 회고 생성 등 다른 모델 작업과 겹치지 않게 공용 게이트 안에서 실행.
+                // VAD(ONNX)도 게이트 안에서 만들어, 대기 중 취소돼도 해제 안 된 네이티브 자원이 남지 않게 한다.
+                val result = withContext(dispatcher) {
+                    ModelGate.shared.withModel(onWait = { onStage(PipelineStage.Waiting) }) {
+                        DiaryPipeline(
+                            vad = SileroVad(app),
+                            trimmer = SilenceTrimmer(),
+                            transcriber = WhisperTranscriber(app, paths.whisperModel.absolutePath),
+                            analyzer = LiteRtDiaryAnalyzer(paths.gemmaModel.absolutePath, app.cacheDir.absolutePath),
+                            onStage = onStage,
+                            onTranscript = { text -> _state.value = _state.value.copy(transcript = text) },
+                        ).run(pcm, workWav)
+                    }
+                }
                 val durationSec = pcm.size / (16000 * 2)
                 withContext(dispatcher) {
                     runCatching { repo.saveEntry(_state.value.transcript, result, durationSec) }

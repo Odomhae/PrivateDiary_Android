@@ -18,7 +18,13 @@ class LiteRtTextGenerator(
         val e = Engine(
             EngineConfig(modelPath = modelPath, backend = Backend.CPU(), cacheDir = cacheDir)
         )
-        e.initialize()
+        // 초기화 실패 시 만들어진 네이티브 엔진을 닫는다(누수 방지).
+        try {
+            e.initialize()
+        } catch (t: Throwable) {
+            e.close()
+            throw t
+        }
         engine = e
     }
 
