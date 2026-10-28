@@ -52,7 +52,8 @@ class PipelineViewModel(app: Application) : AndroidViewModel(app) {
                     onTranscript = { text -> _state.value = _state.value.copy(transcript = text) },
                 )
                 val workWav = File(File(app.filesDir, "recordings"), "last.wav")
-                val result = withContext(dispatcher) { pipeline.run(pcm, workWav) }
+                // 회고 생성 등 다른 모델 작업과 겹치지 않게 공용 게이트 안에서 실행
+                val result = withContext(dispatcher) { ModelGate.shared.withModel { pipeline.run(pcm, workWav) } }
                 val durationSec = pcm.size / (16000 * 2)
                 withContext(dispatcher) {
                     runCatching { repo.saveEntry(_state.value.transcript, result, durationSec) }
