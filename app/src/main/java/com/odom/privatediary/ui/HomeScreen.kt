@@ -13,8 +13,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +28,7 @@ fun HomeScreen(
     onCalendar: () -> Unit,
     onSearch: () -> Unit,
     onReport: () -> Unit,
+    onSettings: () -> Unit,
     onEntry: (String) -> Unit,
 ) {
     val entries by vm.entries.collectAsStateWithLifecycle()
@@ -34,7 +37,10 @@ fun HomeScreen(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("음성 일기")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("음성 일기", Modifier.weight(1f))
+            TextButton(onClick = onSettings) { Text("설정") }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onRecord) { Text("녹음") }
             OutlinedButton(onClick = onCalendar) { Text("캘린더") }

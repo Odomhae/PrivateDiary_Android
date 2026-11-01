@@ -29,11 +29,15 @@ fun AppNavHost(startDestination: String = "home") {
                 onCalendar = { nav.navigate("calendar") },
                 onSearch = { nav.navigate("search") },
                 onReport = { nav.navigate("report") },
+                onSettings = { nav.navigate("settings") },
                 onEntry = { id -> nav.navigate("detail/$id") },
             )
         }
         composable("report") {
             ReportScreen(vm = viewModel(), onBack = { nav.popBackStack() })
+        }
+        composable("settings") {
+            SettingsScreen(vm = viewModel(), onBack = { nav.popBackStack() })
         }
         composable("search") {
             SearchScreen(
