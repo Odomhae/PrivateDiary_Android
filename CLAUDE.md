@@ -26,16 +26,16 @@ Use the Gradle wrapper (`./gradlew` on Unix, `gradlew.bat` on Windows/PowerShell
 ```bash
 ./gradlew assembleDebug          # build debug APK
 ./gradlew installDebug           # build + install on connected device/emulator
-./gradlew test                   # JVM unit tests (app/src/test)
+./gradlew :app:testDebugUnitTest # JVM unit tests (app/src/test), debug variant only — faster than `test`
 ./gradlew connectedAndroidTest   # instrumented tests on device (app/src/androidTest)
-./gradlew lint                   # Android Lint
+./gradlew :app:lintDebug         # Android Lint (report: app/build/reports/lint-results-debug.html)
 ```
 
 Run a single unit test class or method:
 
 ```bash
-./gradlew test --tests "com.odom.privatediary.ExampleUnitTest"
-./gradlew test --tests "com.odom.privatediary.ExampleUnitTest.someMethod"
+./gradlew :app:testDebugUnitTest --tests "com.odom.privatediary.lock.LockPolicyTest"
+./gradlew :app:testDebugUnitTest --tests "com.odom.privatediary.lock.LockPolicyTest.long_background_locks"
 ```
 
 Device notes:
@@ -69,6 +69,11 @@ MVVM + unidirectional data flow (ViewModel + StateFlow, Repository layer). The s
 - `settings`: DataStore
 - `ui`: screens and `AppNavHost`. `MainActivity` is a `FragmentActivity`, because `BiometricPrompt` requires it.
 
+How these packages work together:
+- **Choosing the start screen.** `MainActivity` asks `ModelPaths.from(context)` whether both model files exist. If they do, the app starts on `home`; otherwise it starts on `onboarding`. `ModelPaths` looks in the AI pack location first (`AiPackManager.getPackLocation`) and falls back to the side-loaded `files/models/`.
+- **App lock.** The lock is an overlay drawn on top of `AppNavHost`, so the screen underneath is never torn down and navigation and recording state survive a lock. `MainActivity.onStart`/`onStop` feed `AppLock`. All lock decisions are made in `LockPolicy`, so change that class (and `LockPolicyTest`) rather than adding conditions in the UI.
+- **The bench screen is not reachable.** `bench/BenchScreen.kt` is phase-1 tooling and no navigation route leads to it.
+
 Keep the runtimes behind `Transcriber` / `DiaryAnalyzer` so the runtime or model can be swapped. Long inference must run **outside ViewModel scope** so it survives rotation and backgrounding. The weekly report does this. **The record pipeline still runs in `viewModelScope` and needs to move.** Put pure logic in plain classes/objects with JVM tests (TDD), and keep Android-bound code thin.
 
 ## Processing pipeline (spec §4)
@@ -79,11 +84,23 @@ record (≤60s) → VAD trims silence → Whisper transcribe
 ```
 
 - The LLM returns a **fixed JSON schema** (summary / emotion / intensity / causes / keywords / reply / crisis — see spec §3.4). `emotion` and `causes` use fixed label sets, not free text. On JSON parse failure: retry once, else store transcript only and mark analysis `failed`.
-- **Crisis handling (§5.3):** rule-based keyword check is primary, LLM `crisis` is secondary. On detection, show a **fixed message** + counseling contact (자살예방 상담전화 **109**) instead of the LLM `reply`. The app never diagnoses or counsels.
+- **Crisis handling (§5.3):** rule-based keyword check is primary, LLM `crisis` is secondary. On detection, show a **fixed message** + counseling contact (자살예방 상담전화 **109**) instead of the LLM `reply`. The app never diagnoses or counsels. The crisis check runs in several places, and all of them must stay in sync:
+  - `DiaryPipeline` stores `CrisisDetector.detect(transcript) || llm.crisis`.
+  - `DiaryRepository.updateTranscript` recomputes the flag when a transcript is edited.
+  - Screens show `CrisisNotice` instead of `reply`.
+  - The weekly report leaves crisis entries' summaries out of the prompt. When the report is displayed, a generated body that trips the detector is replaced with the fixed message.
 
 ## Data model
 
 Room entities `Entry` and `WeeklyReport` are specified in `voice-diary-spec.md` §6 (note `causes`/`keywords` stored as JSON arrays in TEXT columns; `analysis_status` ∈ pending/done/failed). Search uses `LIKE` over transcript + summary. Phase 5a chose this over FTS4 to keep schema v1.
+
+## Workflow conventions
+
+Workflow conventions, as seen in `git log` and `docs/superpowers/`:
+- Each phase gets a design spec (`docs/superpowers/specs/YYYY-MM-DD-phaseN-*-design.md`) and a plan (`docs/superpowers/plans/`) before any code is written.
+- Implementation commits use `feat(<area>): …` / `build: …` / `docs: …`.
+- After a review pass comes a `fix(<phase>): address review — …` commit.
+- Gradle runs inline. Delegated subagents have not been able to run Gradle in this environment.
 
 ## Before implementing model/runtime work
 
