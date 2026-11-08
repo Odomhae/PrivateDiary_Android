@@ -3,14 +3,27 @@
 모델 파일은 저장소에 커밋하지 않는다. 아래 절차로 기기에 직접 넣는다. 앱 패키지는 `com.odom.privatediary`.
 
 ## 1. 모델 내려받기
-- **Whisper Small ggml**: whisper.cpp 모델 저장소에서 `ggml-small.bin` (약 466MB~). 파일명을 `ggml-small.bin`으로 둔다.
-- **Gemma 3 1B IT int4 (LiteRT-LM)**: HuggingFace `litert-community/Gemma3-1B-IT`의 `gemma3-1b-it-int4.litertlm` (약 584MB).
-  Play AI pack 한도(팩당 1.5GB) 때문에 Gemma 3n/4 E2B(2.0~3.7GB) 대신 이 모델을 쓴다. 라이선스는 Gemma 약관.
+- **Whisper Small ggml**: `ggml-small.bin` (약 466MB). 파일명 그대로 둔다.
+  - 페이지: https://huggingface.co/ggerganov/whisper.cpp
+  - 바로 받기: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+- **Gemma 3 1B IT int4 (LiteRT-LM)**: `gemma3-1b-it-int4.litertlm` (약 584MB).
+  - 페이지: https://huggingface.co/litert-community/Gemma3-1B-IT (Files 탭)
+  - **Hugging Face 로그인 + Gemma 이용 약관 동의 후** 받을 수 있다. 파일명이 `ModelPaths.GEMMA_FILE`과 정확히 같아야 한다(비슷한 이름의 다른 변형 파일 주의).
+  - Play AI pack 한도(팩당 1.5GB) 때문에 Gemma 3n/4 E2B(2.0~3.7GB) 대신 이 모델을 쓴다.
 
 > `ModelPaths`는 Play AI pack(`whisper_pack`, `gemma_pack`)의 assets 경로를 먼저 보고, 없으면 `files/models/`(adb 사이드로드)를 쓴다.
 > Android Studio `installDebug`로 설치하면 팩이 같이 설치되지 않으므로 개발 중에는 아래 2번의 사이드로드를 쓰거나 bundletool `--local-testing`을 쓴다.
 
-## 2. 기기로 push (앱 1회 설치 후)
+## 2. debug 빌드에서 쓰기 — 기기로 push (앱 1회 설치 후)
+
+> **debug 주의사항**
+> - **arm64 실기기 필요.** `abiFilters = arm64-v8a`라 Windows의 x86_64 에뮬레이터에는 설치되지 않는다(`INSTALL_FAILED_NO_MATCHING_ABIS`).
+> - `installDebug`/Android Studio Run은 APK만 설치해 **AI pack이 전달되지 않는다.** 팩 폴더(`*_pack/src/main/assets/`)에 넣어도 소용없고, 아래처럼 `files/models/`에 넣는다. 이때 온보딩의 다운로드는 Play가 처리하지 못해 오류가 나는 게 정상이다.
+> - 앱을 한 번 실행해 `files/models`를 만든 뒤 push하고, 앱을 다시 시작한다. 두 모델이 모두 있으면 온보딩을 건너뛰고 홈으로 간다.
+> - 앱 삭제·데이터 삭제 시 모델도 지워진다 → 다시 push.
+> - 모델이 들어가면 현재 구현된 기능(녹음→전사→분석, 캘린더, 상세, 검색, 위기 안내, 주간 회고, 앱 잠금)은 debug에서 모두 동작한다(코드 기준, 기기 실측 전). 녹음 분석 중 화면 회전·이탈은 피한다(파이프라인이 아직 ViewModel 범위).
+> - 앱 잠금은 기기에 화면 잠금(PIN·패턴·지문)이 있어야 켤 수 있다.
+
 ```bash
 adb shell run-as com.odom.privatediary mkdir -p files/models files/samples
 # 모델
@@ -36,7 +49,7 @@ adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/sa
    화면 하단 로그에도 모델별 지연시간·PSS가 표시된다.
 
 > **측정값 해석 주의**
-> - `pssKb`는 **추론 직후 1회 측정한 PSS(KB)** 로, 진짜 피크가 아니라 말단 샘플이다 — 실제 피크보다 **낮게** 나올 수 있다. Gemma 3n E2B가 기기 RAM(~8GB)에 맞는지 판단할 때는 이 값을 **하한**으로 보고 여유를 둬야 한다.
+> - `pssKb`는 **추론 직후 1회 측정한 PSS(KB)** 로, 진짜 피크가 아니라 말단 샘플이다 — 실제 피크보다 **낮게** 나올 수 있다. Gemma 3 1B + Whisper Small이 대상 기기 RAM에 맞는지 판단할 때는 이 값을 **하한**으로 보고 여유를 둬야 한다.
 > - 화면에 `whisper ERROR ...` / `gemma ERROR ...` 로그가 뜨면 그 샘플은 **CSV에 행이 기록되지 않는다**(생성/엔진 예외는 재시도하지 않음). ERROR가 보이면 해당 녹음은 실패로 간주하고 원인을 따로 적는다.
 
 ## 4. 측정 기록 (녹음 10개)
@@ -50,11 +63,11 @@ adb shell "run-as com.odom.privatediary cp /data/local/tmp/sample01.wav files/sa
 ## 5. 런타임·포맷 확정 판단 (1단계 산출물)
 - [ ] whisper-android AAR의 한국어 전사 품질이 쓸만한가? (아니면 스펙 §2.2의 whisper.cpp 직접 JNI 빌드로 전환 — `Transcriber` 인터페이스 뒤라 교체 비용 낮음)
 - [ ] whisper-android AAR(커뮤니티 아티팩트)의 안정성·무결성 확인 (오프라인 동작이므로 프라이버시 원칙엔 부합)
-- [ ] Gemma 3n E2B가 대상 기기에서 메모리·속도 허용 범위인가? (파일 ~3.7GB / RAM ~8GB — 스펙의 2GB/6GB 가정을 상향해야 함)
+- [ ] Gemma 3 1B int4가 대상 기기에서 메모리·속도 허용 범위인가? 한국어 요약·감정 분석 품질이 쓸만한가? (1B라 품질이 핵심 위험)
 - [ ] `conversation.sendMessage(...).toString()`이 실제 생성 텍스트 전체를 주는지 확인 (아니면 `LiteRtDiaryAnalyzer`의 텍스트 추출을 0.17.x 실제 접근자로 교정)
 - [ ] 감정/causes 라벨 일관성 (같은 전사 반복 입력 시 흔들림)
 - [ ] 최종 결정: LLM 런타임 = LiteRT-LM 유지 / 변경, 포맷 = `.litertlm`
-- [ ] 위 결론을 `voice-diary-spec.md` §2.2/§2.5/§3에 반영
+- [ ] 위 결론을 `voice-diary-spec.md` §2.2/§2.5/§3/§8에 반영
 
 ## 4단계: 모델 배포 — Play AI pack (fast-follow)
 R2 다운로드는 Play for On-device AI(AI pack)로 대체했다. 앱은 네트워크 권한이 없고, 다운로드·무결성 검증은 Play 스토어가 한다.
@@ -64,6 +77,9 @@ R2 다운로드는 Play for On-device AI(AI pack)로 대체했다. 앱은 네트
 - 팩당 압축 기준 1.5GB, 앱 전체 4GB 한도. 더 큰 모델로 바꾸려면 파일 분할·재조립이 필요하다.
 - `./gradlew :app:bundleRelease`로 AAB를 만들어 Play Console에 올린다(APK로는 팩이 전달되지 않음).
 - 로컬 확인: `bundletool build-apks --bundle=app-release.aab --output=app.apks --local-testing` → `bundletool install-apks --apks=app.apks` (bundletool 1.18.0+). local-testing에서는 fast-follow가 on-demand처럼 동작하므로 온보딩의 fetch가 실제로 요청한다.
+  - debug로도 가능: `./gradlew :app:bundleDebug` → `--bundle=app/build/outputs/bundle/debug/app-debug.aab`. **팩 assets에 모델을 넣고 빌드해야 한다**(안 넣으면 빈 팩).
+- 최종 확인: Play Console 내부 테스트 트랙 / 내부 앱 공유(실제 Play 다운로드, 서명·업로드 필요).
+- 상태(2026-11-09): local-testing·Play 경로 모두 기기 미확인.
 - 기기에서 확인: 온보딩 진행률 → (모바일 데이터면) "모바일 데이터로 받기" 확인 대화상자 → `home` 진입.
 
 ## 참고: 1단계에서 확정된 빌드 환경

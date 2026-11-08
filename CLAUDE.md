@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This is a **fresh Android Studio Compose template** (just `MainActivity` + `ui/theme/`). Almost nothing from the product spec is implemented yet. The real design lives in **`voice-diary-spec.md`** (Korean) — treat it as the source of truth for architecture, data model, and feature scope. Read it before building any feature.
+Phases 1–5c of `voice-diary-spec.md` §8 are implemented (pipeline, Room data layer, screens, Play AI pack delivery, crisis handling + search, weekly report, app lock + settings). Phase 6 (polish/release) has not started, and **nothing has been verified on a real device yet** — including the phase-1 measurements in `MODELS.md` §4–5. Spec §8 has the status table and §8.1 lists the remaining work. **`voice-diary-spec.md`** (Korean) is the source of truth for scope; per-phase design specs and plans are in `docs/superpowers/specs/` and `docs/superpowers/plans/`. `MODELS.md` covers getting the models, side-loading for debug builds, and testing AI packs locally.
 
 ## What this app is
 
-**1분 음성 일기** — a fully **on-device** voice diary. The user speaks for up to 60s; the device transcribes (Whisper Small via whisper.cpp/JNI), then summarizes + does emotion analysis (Gemma on an on-device LLM runtime), and shows emotion trends over time.
+**1분 음성 일기** — a fully **on-device** voice diary. The user speaks for up to 60s; the device transcribes (Whisper Small, `whisper-android` AAR wrapping whisper.cpp), then summarizes + does emotion analysis (Gemma 3 1B IT int4 on LiteRT-LM 0.17.1), and shows emotion trends over time.
 
 Non-negotiable constraints from the spec that shape every design decision:
 
@@ -16,12 +16,12 @@ Non-negotiable constraints from the spec that shape every design decision:
 - **The app makes no network calls.** Models ship as Play AI packs (`:whisper_pack`, `:gemma_pack`, fast-follow) downloaded by the Play Store; there is no INTERNET permission. No analytics, logging, or telemetry. AI packs are capped at 1.5GB each — this is why the LLM is Gemma 3 1B int4.
 - **Zero inference cost** — all models run locally on the user's device.
 - **arm64-v8a only.** Models live in internal storage (`filesDir`), never external storage.
-- **Never load Whisper and Gemma into memory at the same time** — release one before loading the other (see pipeline in spec §4).
-- Diary DB is excluded from Google cloud auto-backup by default.
+- **Never load Whisper and Gemma into memory at the same time.** Every model job runs inside `ModelGate.shared` (a Mutex).
+- Diary DB, recordings and settings are excluded from Google cloud backup (`res/xml/data_extraction_rules.xml`, `backup_rules.xml`). Keep it that way.
 
 ## Build & test
 
-Use the Gradle wrapper (`./gradlew` on Unix, `gradlew.bat` on Windows/PowerShell). Single-module project; the module is `:app`.
+Use the Gradle wrapper (`./gradlew` on Unix, `gradlew.bat` on Windows/PowerShell). Modules: `:app`, plus the AI pack modules `:whisper_pack` and `:gemma_pack` (assets only; model files are git-ignored).
 
 ```bash
 ./gradlew assembleDebug          # build debug APK
@@ -38,26 +38,38 @@ Run a single unit test class or method:
 ./gradlew test --tests "com.odom.privatediary.ExampleUnitTest.someMethod"
 ```
 
+Device notes:
+- The app is **arm64-only**, so x86_64 emulators can't install it. Use a real arm64 device.
+- `installDebug` doesn't deliver the AI packs. For debug builds, side-load the models into `files/models/` (`MODELS.md` §2). To test pack download, use `bundleDebug`/`bundleRelease` + bundletool `--local-testing`.
+
 ## Toolchain specifics
 
-- **AGP `9.2.0-alpha08`, Kotlin `2.2.10`, Compose BOM `2026.02.01`** — these are bleeding-edge/alpha. Dependency versions are centralized in `gradle/libs.versions.toml` (version catalog); add dependencies there and reference via `libs.*`, not inline coordinates.
-- `compileSdk`/`targetSdk` = 36, `minSdk` = 26 (may rise per LLM-runtime requirements — see spec §2.5).
+- **AGP `9.2.0-alpha08`, Kotlin `2.4.0`, KSP `2.3.12`, Compose BOM `2026.02.01`.** These are bleeding-edge/alpha. Kotlin 2.4 is required by litertlm 0.17.1's stdlib. Versions are centralized in `gradle/libs.versions.toml` (version catalog); add dependencies there and reference them via `libs.*`, not inline coordinates.
+- `compileSdk` = 37, `targetSdk` = 36, `minSdk` = 26.
 - Java/Kotlin target: **JVM 11**.
 - `namespace` / `applicationId`: `com.odom.privatediary`.
-- The project does **not** yet declare Hilt, Room, Navigation, Coroutines, NDK/CMake, or the STT/LLM runtimes — these are planned (spec §2.2) and must be added as features are built.
+- Key deps:
+  - Room 2.8.5 (KSP), Navigation Compose, Coroutines, kotlinx-serialization
+  - `play:ai-delivery` 0.2.0-beta01, `whisper-android` 1.0.0, `litertlm-android` 0.17.1, `android-vad` silero (jitpack)
+  - biometric 1.1.0, datastore-preferences 1.2.1, fragment-ktx 1.9.1
+- Not used: Hilt (singletons via `X.get(context)` + `AndroidViewModel`), NDK/CMake, OkHttp, WorkManager.
+- Manifest declares only `RECORD_AUDIO`. Do not add `INTERNET`.
 
-## Architecture to build toward (from the spec)
+## Architecture
 
-MVVM + unidirectional data flow (ViewModel + StateFlow, Repository layer). The spec proposes a multi-module layout — the repo is currently single-module `:app`, so introduce modules as the work reaches each layer:
+MVVM + unidirectional data flow (ViewModel + StateFlow, Repository layer). The spec's multi-module layout (spec §2.3) is not adopted yet. Everything lives in `:app`, split by package under `com.odom.privatediary`:
 
-- `core/audio` — recording (`AudioRecord`, 16kHz mono 16-bit PCM) + VAD (Silero)
-- `core/stt` — whisper.cpp JNI wrapper behind a `Transcriber` interface
-- `core/llm` — Gemma runtime wrapper behind a `DiaryAnalyzer` interface, prompts, JSON parsing
-- `core/model` — model download (WorkManager + OkHttp), version manifest, SHA-256 checksum, resumable Range requests
-- `core/data` — Room (+ FTS4 full-text search), Repository, DataStore
-- `feature/record`, `feature/calendar`, `feature/report`, `feature/settings`
+- `bench`: runtime wrappers behind the `Transcriber` / `DiaryAnalyzer` interfaces (`WhisperTranscriber`, `LiteRtDiaryAnalyzer`, `LiteRtTextGenerator`), plus the prompt, JSON schema/parsing, `ModelPaths`, and the phase-1 bench screen
+- `pipeline`: `AudioRecorder` (16kHz mono 16-bit PCM), Silero VAD + `SilenceTrimmer`, `DiaryPipeline`, `ModelGate`, record screen
+- `data`: Room `DiaryDatabase` (schema v1), DAOs, `DiaryRepository`, `LIKE` search
+- `download`: AI pack state tracking (`DownloadViewModel`, `ModelPacks`) + onboarding
+- `safety`: rule-based `CrisisDetector`
+- `report`: weekly report (`WeeklyReportService` runs in an app-wide scope)
+- `lock`: `LockPolicy` (pure logic) + `AppLock` + `BiometricPrompt` + lock overlay
+- `settings`: DataStore
+- `ui`: screens and `AppNavHost`. `MainActivity` is a `FragmentActivity`, because `BiometricPrompt` requires it.
 
-Keep `core/stt` and `core/llm` behind the `Transcriber` / `DiaryAnalyzer` interfaces so the runtime or model can be swapped. Long inference must run **outside ViewModel scope** (Repository or WorkManager) so it survives rotation/backgrounding.
+Keep the runtimes behind `Transcriber` / `DiaryAnalyzer` so the runtime or model can be swapped. Long inference must run **outside ViewModel scope** so it survives rotation and backgrounding. The weekly report does this. **The record pipeline still runs in `viewModelScope` and needs to move.** Put pure logic in plain classes/objects with JVM tests (TDD), and keep Android-bound code thin.
 
 ## Processing pipeline (spec §4)
 
@@ -71,8 +83,8 @@ record (≤60s) → VAD trims silence → Whisper transcribe
 
 ## Data model
 
-Room entities `Entry` and `WeeklyReport` are specified in `voice-diary-spec.md` §6 (note `causes`/`keywords` stored as JSON arrays in TEXT columns; `analysis_status` ∈ pending/done/failed). A separate FTS4 table backs transcript search.
+Room entities `Entry` and `WeeklyReport` are specified in `voice-diary-spec.md` §6 (note `causes`/`keywords` stored as JSON arrays in TEXT columns; `analysis_status` ∈ pending/done/failed). Search uses `LIKE` over transcript + summary. Phase 5a chose this over FTS4 to keep schema v1.
 
 ## Before implementing model/runtime work
 
-Spec §9 lists open questions that must be resolved first (Gemma license terms, model file size/quantization, whether Gemma's audio input can replace Whisper, Korean-language quality, emotion-label consistency, R2 free-tier limits). Don't hard-code model choices without checking these.
+Spec §9 lists the open questions: Gemma license terms, Korean-language quality (the main risk with a 1B model), and emotion-label consistency. Model files are `ggml-small.bin` and `gemma3-1b-it-int4.litertlm` (`ModelPaths`). Each AI pack must stay ≤1.5GB. Record the outcome of phase-1 device measurements in `MODELS.md` before changing models or runtimes.
